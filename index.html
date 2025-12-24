@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rewards Pro | User Portal</title>
+    <title>Elite Rewards | Secure Access</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
@@ -24,32 +24,79 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // --- AUTH & CORE ---
-        window.login = async () => {
+        // --- AUTH LOGIC ---
+        window.switchAuth = (mode) => {
+            const loginBox = document.getElementById('login-box');
+            const regBox = document.getElementById('reg-box');
+            const authTitle = document.getElementById('auth-title');
+
+            if(mode === 'reg') {
+                loginBox.classList.add('hidden');
+                regBox.classList.remove('hidden');
+                authTitle.innerText = "Create Account";
+            } else {
+                regBox.classList.add('hidden');
+                loginBox.classList.remove('hidden');
+                authTitle.innerText = "Welcome Back";
+            }
+        };
+
+        window.handleRegister = async () => {
+            const name = document.getElementById('r_name').value;
+            const phone = document.getElementById('r_phone').value;
+            const pass = document.getElementById('r_pass').value;
+
+            if(!name || !phone || !pass) return alert("Please fill all fields");
+
+            const userRef = ref(db, 'users/' + phone);
+            const snap = await get(userRef);
+
+            if(snap.exists()) {
+                alert("Number already registered! Please Login.");
+            } else {
+                await set(userRef, { 
+                    name, phone, password: pass, balance: 0, status: 'New', profilePic: 'https://cdn-icons-png.flaticon.com/512/149/149071.png' 
+                });
+                alert("Account Created! You can now Login.");
+                switchAuth('login');
+            }
+        };
+
+        window.handleLogin = async () => {
             const phone = document.getElementById('l_phone').value;
             const pass = document.getElementById('l_pass').value;
+
             const snap = await get(ref(db, 'users/' + phone));
             if(snap.exists() && snap.val().password === pass) {
                 localStorage.setItem('user', phone);
                 location.reload();
-            } else { alert("Error: Check phone/password"); }
+            } else {
+                alert("Invalid Phone Number or Password");
+            }
         };
 
-        function initApp() {
+        // --- DASHBOARD INIT ---
+        function init() {
             const user = localStorage.getItem('user');
-            if(!user) return;
-            document.getElementById('auth-sec').classList.add('hidden');
-            document.getElementById('app-sec').classList.remove('hidden');
+            if(user) {
+                document.getElementById('auth-sec').classList.add('hidden');
+                document.getElementById('app-sec').classList.remove('hidden');
+                loadUserData(user);
+            }
+            loadDialog();
+        }
 
-            // Listen for User Data
+        function loadUserData(user) {
             onValue(ref(db, 'users/' + user), (snap) => {
                 const data = snap.val();
                 document.getElementById('u_bal').innerText = data.balance;
                 document.getElementById('u_status').innerText = data.status === 'AlreadyUsed' ? "This number is already used" : data.status;
-                document.getElementById('prof_img').src = data.profilePic || 'https://via.placeholder.com/100';
+                document.getElementById('nav_name').innerText = data.name;
+                document.getElementById('prof_img').src = data.profilePic;
             });
+        }
 
-            // --- ADMIN DIALOG SYSTEM ---
+        function loadDialog() {
             onValue(ref(db, 'globalDialog'), (snap) => {
                 const data = snap.val();
                 if(data && data.active) {
@@ -64,62 +111,120 @@
 
         window.closeDialog = () => document.getElementById('admin-dialog').classList.add('hidden');
         window.logout = () => { localStorage.clear(); location.reload(); };
-        window.onload = initApp;
+        window.onload = init;
     </script>
+
+    <style>
+        .auth-input { @apply w-full bg-gray-50 border border-gray-200 p-4 pl-12 rounded-2xl outline-none focus:border-indigo-500 focus:bg-white transition-all; }
+        .input-icon { @apply absolute left-4 top-1/2 -translate-y-1/2 text-gray-400; }
+    </style>
 </head>
-<body class="bg-slate-100">
+<body class="bg-slate-50 font-sans">
 
-    <!-- Auth Section -->
-    <div id="auth-sec" class="flex items-center justify-center min-h-screen bg-indigo-600 px-6">
-        <div class="bg-white p-8 rounded-3xl w-full max-w-sm">
-            <h2 class="text-2xl font-black mb-6 text-indigo-600">Login</h2>
-            <input id="l_phone" type="number" placeholder="Number" class="w-full border p-4 rounded-xl mb-4 outline-none">
-            <input id="l_pass" type="password" placeholder="Password" class="w-full border p-4 rounded-xl mb-6 outline-none">
-            <button onclick="login()" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold">Login</button>
+    <!-- 1. AUTHENTICATION SECTION -->
+    <div id="auth-sec" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-700 to-purple-800 px-6">
+        <div class="bg-white p-8 rounded-[2.5rem] shadow-2xl w-full max-w-sm relative overflow-hidden">
+            <!-- Decorative circle -->
+            <div class="absolute -top-10 -right-10 w-32 h-32 bg-indigo-50 rounded-full"></div>
+            
+            <div class="relative">
+                <h1 id="auth-title" class="text-3xl font-black text-gray-800 mb-2">Welcome Back</h1>
+                <p class="text-gray-500 text-sm mb-8">Access your rewards dashboard</p>
+
+                <!-- Login Box -->
+                <div id="login-box">
+                    <div class="space-y-4">
+                        <div class="relative">
+                            <i class="fas fa-phone input-icon"></i>
+                            <input id="l_phone" type="number" placeholder="Phone Number" class="w-full bg-gray-50 border border-gray-200 p-4 pl-12 rounded-2xl outline-none focus:border-indigo-500 focus:bg-white transition-all">
+                        </div>
+                        <div class="relative">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input id="l_pass" type="password" placeholder="Password" class="w-full bg-gray-50 border border-gray-200 p-4 pl-12 rounded-2xl outline-none focus:border-indigo-500 focus:bg-white transition-all">
+                        </div>
+                    </div>
+                    <button onclick="handleLogin()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl shadow-lg mt-8 transition-transform active:scale-95">
+                        Login Now
+                    </button>
+                    <p class="mt-6 text-center text-sm text-gray-600">
+                        Don't have an account? <button onclick="switchAuth('reg')" class="text-indigo-600 font-bold hover:underline">Create Account</button>
+                    </p>
+                </div>
+
+                <!-- Register Box -->
+                <div id="reg-box" class="hidden">
+                    <div class="space-y-4">
+                        <div class="relative">
+                            <i class="fas fa-user input-icon"></i>
+                            <input id="r_name" type="text" placeholder="Full Name" class="w-full bg-gray-50 border border-gray-200 p-4 pl-12 rounded-2xl outline-none focus:border-indigo-500 focus:bg-white transition-all">
+                        </div>
+                        <div class="relative">
+                            <i class="fas fa-phone input-icon"></i>
+                            <input id="r_phone" type="number" placeholder="Phone Number" class="w-full bg-gray-50 border border-gray-200 p-4 pl-12 rounded-2xl outline-none focus:border-indigo-500 focus:bg-white transition-all">
+                        </div>
+                        <div class="relative">
+                            <i class="fas fa-lock input-icon"></i>
+                            <input id="r_pass" type="password" placeholder="Set Password" class="w-full bg-gray-50 border border-gray-200 p-4 pl-12 rounded-2xl outline-none focus:border-indigo-500 focus:bg-white transition-all">
+                        </div>
+                    </div>
+                    <button onclick="handleRegister()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-2xl shadow-lg mt-8 transition-transform active:scale-95">
+                        Register Account
+                    </button>
+                    <p class="mt-6 text-center text-sm text-gray-600">
+                        Already have account? <button onclick="switchAuth('login')" class="text-purple-600 font-bold hover:underline">Sign In</button>
+                    </p>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- User Dashboard -->
+    <!-- 2. MAIN APPLICATION SECTION -->
     <div id="app-sec" class="hidden pb-20">
-        <div class="bg-indigo-600 p-6 rounded-b-[40px] text-white flex justify-between items-center shadow-lg">
+        <!-- Header -->
+        <div class="bg-indigo-600 p-6 rounded-b-[3rem] text-white flex justify-between items-center shadow-xl">
             <div class="flex items-center gap-3">
-                <img id="prof_img" class="w-10 h-10 rounded-full border-2 border-white object-cover">
-                <h1 class="font-bold">Dashboard</h1>
+                <img id="prof_img" class="w-12 h-12 rounded-full border-2 border-white object-cover shadow-md">
+                <div>
+                    <p class="text-[10px] opacity-70 uppercase tracking-wider">Verified User</p>
+                    <h1 id="nav_name" class="font-bold text-lg leading-tight">...</h1>
+                </div>
             </div>
-            <button onclick="logout()"><i class="fas fa-sign-out-alt"></i></button>
+            <button onclick="logout()" class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center"><i class="fas fa-power-off"></i></button>
         </div>
 
+        <!-- Content -->
         <div class="p-6 space-y-6">
-            <div class="bg-white p-8 rounded-3xl shadow-md border-b-4 border-indigo-600">
-                <p class="text-gray-400 text-xs font-bold uppercase">Your Balance</p>
-                <h1 class="text-4xl font-black text-indigo-700">৳ <span id="u_bal">0</span></h1>
+            <div class="bg-white p-8 rounded-[2rem] shadow-xl border-b-8 border-indigo-600">
+                <p class="text-gray-400 text-xs font-bold uppercase mb-1">Available Balance</p>
+                <h1 class="text-5xl font-black text-indigo-700">৳ <span id="u_bal">0</span></h1>
             </div>
-            <div class="bg-white p-6 rounded-3xl shadow-sm text-center">
-                <p class="text-sm text-gray-500 mb-2">Status</p>
-                <div id="u_status" class="font-bold text-indigo-600">New</div>
+
+            <div class="bg-white p-6 rounded-[2rem] shadow-md flex justify-between items-center">
+                <span class="text-gray-500 font-medium">Verification Status:</span>
+                <span id="u_status" class="bg-indigo-50 text-indigo-600 px-4 py-1 rounded-full font-bold text-sm">...</span>
             </div>
         </div>
     </div>
 
-    <!-- GLOBAL ADMIN DIALOG (MODAL) -->
-    <div id="admin-dialog" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
-        <div class="bg-white rounded-3xl w-full max-w-sm overflow-hidden relative shadow-2xl animate-bounce-short">
-            <button onclick="closeDialog()" class="absolute top-4 right-4 bg-gray-100 w-8 h-8 rounded-full flex items-center justify-center text-gray-500">
+    <!-- 3. DIALOG POPUP -->
+    <div id="admin-dialog" class="hidden fixed inset-0 bg-black/70 backdrop-blur-md z-[100] flex items-center justify-center p-6">
+        <div class="bg-white rounded-[2.5rem] w-full max-w-sm overflow-hidden relative shadow-2xl">
+            <button onclick="closeDialog()" class="absolute top-4 right-4 bg-gray-100 w-10 h-10 rounded-full flex items-center justify-center text-gray-500 z-10">
                 <i class="fas fa-times"></i>
             </button>
-            <img id="dg-img" class="w-full h-48 object-cover">
-            <div class="p-6 text-center">
-                <h3 id="dg-title" class="text-xl font-black text-gray-800 mb-2">Notice</h3>
-                <p id="dg-sms" class="text-gray-500 text-sm mb-6">Message content goes here.</p>
-                <a id="dg-link" href="#" target="_blank" class="block w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg">Open Link</a>
+            <img id="dg-img" class="w-full h-52 object-cover">
+            <div class="p-8 text-center">
+                <h3 id="dg-title" class="text-2xl font-black text-gray-800 mb-2">Notice</h3>
+                <p id="dg-sms" class="text-gray-500 text-sm mb-8">Message content goes here.</p>
+                <a id="dg-link" href="#" target="_blank" class="block w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-bold shadow-lg transition-transform active:scale-95">Open Link</a>
             </div>
         </div>
     </div>
 
-    <!-- Support Icons -->
-    <div class="fixed right-4 bottom-10 flex flex-col gap-4">
-        <a href="https://api.whatsapp.com/send?phone=8801612684951&text=" class="bg-green-500 w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg"><i class="fab fa-whatsapp text-2xl"></i></a>
-        <a href="https://t.me/accsell06" class="bg-blue-500 w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg"><i class="fab fa-telegram-plane text-2xl"></i></a>
+    <!-- 4. SUPPORT ICONS -->
+    <div class="fixed right-6 bottom-10 flex flex-col gap-4">
+        <a href="https://api.whatsapp.com/send?phone=8801612684951" target="_blank" class="bg-green-500 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-2xl text-2xl border-2 border-white transform transition-transform hover:scale-110"><i class="fab fa-whatsapp"></i></a>
+        <a href="https://t.me/accsell06" target="_blank" class="bg-blue-500 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-2xl text-2xl border-2 border-white transform transition-transform hover:scale-110"><i class="fab fa-telegram-plane"></i></a>
     </div>
 
 </body>
