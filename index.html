@@ -1,21 +1,126 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Subscription Service</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rewards Pro | User Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, set, get, update, onValue, push } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAMVTLS_PK7M4yyMfcdKPHzn8yP1lXxpLQ",
+            authDomain: "text-4cc23.firebaseapp.com",
+            databaseURL: "https://text-4cc23-default-rtdb.firebaseio.com",
+            projectId: "text-4cc23",
+            storageBucket: "text-4cc23.appspot.com",
+            messagingSenderId: "252578219241",
+            appId: "1:252578219241:android:c4b105c06a2715dddf1c78"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // --- AUTH & CORE ---
+        window.login = async () => {
+            const phone = document.getElementById('l_phone').value;
+            const pass = document.getElementById('l_pass').value;
+            const snap = await get(ref(db, 'users/' + phone));
+            if(snap.exists() && snap.val().password === pass) {
+                localStorage.setItem('user', phone);
+                location.reload();
+            } else { alert("Error: Check phone/password"); }
+        };
+
+        function initApp() {
+            const user = localStorage.getItem('user');
+            if(!user) return;
+            document.getElementById('auth-sec').classList.add('hidden');
+            document.getElementById('app-sec').classList.remove('hidden');
+
+            // Listen for User Data
+            onValue(ref(db, 'users/' + user), (snap) => {
+                const data = snap.val();
+                document.getElementById('u_bal').innerText = data.balance;
+                document.getElementById('u_status').innerText = data.status === 'AlreadyUsed' ? "This number is already used" : data.status;
+                document.getElementById('prof_img').src = data.profilePic || 'https://via.placeholder.com/100';
+            });
+
+            // --- ADMIN DIALOG SYSTEM ---
+            onValue(ref(db, 'globalDialog'), (snap) => {
+                const data = snap.val();
+                if(data && data.active) {
+                    document.getElementById('dg-title').innerText = data.title;
+                    document.getElementById('dg-sms').innerText = data.sms;
+                    document.getElementById('dg-img').src = data.img;
+                    document.getElementById('dg-link').href = data.url;
+                    document.getElementById('admin-dialog').classList.remove('hidden');
+                }
+            });
+        }
+
+        window.closeDialog = () => document.getElementById('admin-dialog').classList.add('hidden');
+        window.logout = () => { localStorage.clear(); location.reload(); };
+        window.onload = initApp;
+    </script>
 </head>
-<body>
-  <div class="container">
-    <h1>Subscribe to Exciting Games!</h1>
-    <form id="subscriptionForm">
-      <label for="mobile">Enter Your Mobile Number:</label>
-      <input type="tel" id="mobile" name="mobile" placeholder="+8801XXXXXXXXX" required>
-      <button type="submit">Send OTP</button>
-    </form>
-    <p id="message"></p>
-  </div>
-  <script src="script.js"></script>
+<body class="bg-slate-100">
+
+    <!-- Auth Section -->
+    <div id="auth-sec" class="flex items-center justify-center min-h-screen bg-indigo-600 px-6">
+        <div class="bg-white p-8 rounded-3xl w-full max-w-sm">
+            <h2 class="text-2xl font-black mb-6 text-indigo-600">Login</h2>
+            <input id="l_phone" type="number" placeholder="Number" class="w-full border p-4 rounded-xl mb-4 outline-none">
+            <input id="l_pass" type="password" placeholder="Password" class="w-full border p-4 rounded-xl mb-6 outline-none">
+            <button onclick="login()" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold">Login</button>
+        </div>
+    </div>
+
+    <!-- User Dashboard -->
+    <div id="app-sec" class="hidden pb-20">
+        <div class="bg-indigo-600 p-6 rounded-b-[40px] text-white flex justify-between items-center shadow-lg">
+            <div class="flex items-center gap-3">
+                <img id="prof_img" class="w-10 h-10 rounded-full border-2 border-white object-cover">
+                <h1 class="font-bold">Dashboard</h1>
+            </div>
+            <button onclick="logout()"><i class="fas fa-sign-out-alt"></i></button>
+        </div>
+
+        <div class="p-6 space-y-6">
+            <div class="bg-white p-8 rounded-3xl shadow-md border-b-4 border-indigo-600">
+                <p class="text-gray-400 text-xs font-bold uppercase">Your Balance</p>
+                <h1 class="text-4xl font-black text-indigo-700">৳ <span id="u_bal">0</span></h1>
+            </div>
+            <div class="bg-white p-6 rounded-3xl shadow-sm text-center">
+                <p class="text-sm text-gray-500 mb-2">Status</p>
+                <div id="u_status" class="font-bold text-indigo-600">New</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GLOBAL ADMIN DIALOG (MODAL) -->
+    <div id="admin-dialog" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+        <div class="bg-white rounded-3xl w-full max-w-sm overflow-hidden relative shadow-2xl animate-bounce-short">
+            <button onclick="closeDialog()" class="absolute top-4 right-4 bg-gray-100 w-8 h-8 rounded-full flex items-center justify-center text-gray-500">
+                <i class="fas fa-times"></i>
+            </button>
+            <img id="dg-img" class="w-full h-48 object-cover">
+            <div class="p-6 text-center">
+                <h3 id="dg-title" class="text-xl font-black text-gray-800 mb-2">Notice</h3>
+                <p id="dg-sms" class="text-gray-500 text-sm mb-6">Message content goes here.</p>
+                <a id="dg-link" href="#" target="_blank" class="block w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg">Open Link</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Support Icons -->
+    <div class="fixed right-4 bottom-10 flex flex-col gap-4">
+        <a href="https://api.whatsapp.com/send?phone=8801612684951&text=" class="bg-green-500 w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg"><i class="fab fa-whatsapp text-2xl"></i></a>
+        <a href="https://t.me/accsell06" class="bg-blue-500 w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg"><i class="fab fa-telegram-plane text-2xl"></i></a>
+    </div>
+
 </body>
 </html>
